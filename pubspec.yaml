@@ -10,11 +10,12 @@ dependencies:
   flutter:
     sdk: flutter
   geolocator: ^11.0.0
-  geofencing_2: ^2.1.0
   battery_plus: ^6.0.0
   permission_handler: ^11.3.0
   flutter_foreground_task: ^6.1.1
   provider: ^6.1.2
+  shared_preferences: ^2.2.3
+  path_provider: ^2.1.2
 
 dev_dependencies:
   flutter_test:

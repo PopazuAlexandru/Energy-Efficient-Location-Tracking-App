@@ -1,55 +1,67 @@
 import 'package:permission_handler/permission_handler.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:flutter/services.dart';
 import 'dart:io';
 
 class LocationWrapper {
-  /// Handles the complex permission flow for Android 11+ 
-  /// 1. Request Foreground (Fine) Location
-  /// 2. Request Background Location (Required to be done separately)
+  /// Robustly handles location permission requests for Android 11+
   static Future<bool> requestLocationPermissions() async {
     if (!Platform.isAndroid) return true;
 
-    // 1. Request Fine Location (Foreground)
-    PermissionStatus fineLocationStatus = await Permission.location.request();
+    try {
+      var fineStatus = await Permission.location.status;
+      if (!fineStatus.isGranted) {
+        fineStatus = await Permission.location.request();
+      }
 
-    if (fineLocationStatus.isGranted) {
-      // 2. Request Background Location for Android 11+
-      // This will usually trigger a dialog leading to App Settings on Android 11+
-      PermissionStatus bgLocationStatus = await Permission.locationAlways.request();
-      
-      return bgLocationStatus.isGranted;
+      if (fineStatus.isGranted) {
+        var bgStatus = await Permission.locationAlways.status;
+        if (!bgStatus.isGranted) {
+          bgStatus = await Permission.locationAlways.request();
+        }
+        return bgStatus.isGranted;
+      }
+      return false;
+    } on PlatformException catch (e) {
+      if (e.code == 'PERMISSION_REQUEST_ALREADY_IN_PROGRESS') {
+        print('A permission request is already running. Please wait.');
+      }
+      return false;
+    } catch (e) {
+      print('Error requesting permissions: $e');
+      return false;
     }
-    
-    return false;
   }
 
-  /// Configures location settings based on your research criteria
+  /// Verifies if GPS/Location services are toggled ON in system settings
+  static Future<bool> isServiceEnabled() async {
+    return await Geolocator.isLocationServiceEnabled();
+  }
+
+  /// Opens the system location settings page automatically
+  static Future<void> openLocationSettings() async {
+    await Geolocator.openLocationSettings();
+  }
+
   static LocationSettings getLocationSettings(String mode) {
     switch (mode) {
-      case 'GPS': // High Accuracy
+      case 'GPS':
         return AndroidSettings(
           accuracy: LocationAccuracy.high,
-          distanceFilter: 10,
+          distanceFilter: 0,
           foregroundNotificationConfig: const ForegroundNotificationConfig(
             notificationText: "Tracking High Accuracy GPS",
-            notificationTitle: "Location Research",
+            notificationTitle: "Energy Research",
             enableWakeLock: true,
           ),
         );
-      case 'Network': // Low Power
+      case 'Network':
         return AndroidSettings(
           accuracy: LocationAccuracy.low,
           distanceFilter: 100,
-          intervalDuration: const Duration(minutes: 5),
         );
       default:
-        return const AppleSettings(accuracy: LocationAccuracy.balanced);
+        return AndroidSettings(accuracy: LocationAccuracy.medium);
     }
-  }
-
-  /// Check current battery level using battery_plus logic (to be used in your service)
-  static Future<int> getBatteryLevel() async {
-    // This assumes you have battery_plus imported in your project
-    return 0; // Placeholder for actual battery_plus logic
   }
 }
